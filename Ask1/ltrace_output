@@ -1,0 +1,20 @@
+time(0)                                          = 1727981955
+srand(0x66fee983, 0x7ffcbb9604a8, 0x7b97751a8080, 0x7b9775160680) = 1
+signal(SIGURG, 0x55e4974873d0)                   = 0
+__fprintf_chk(0x7b97751614e0, 1, 0x55e497488011, 0
+Challenge   0: 'Hello there'
+) = 30
+getlogin_r(0x55e49748c640, 64, 0, 0)             = 0
+open("riddle.savegame", 66, 0600)                = 3
+ftruncate(3, 779)                                = 0
+mmap(0, 779, 3, 1)                               = 0x7b97751a7000
+__fprintf_chk(0x7b97751614e0, 1, 0x55e49748804b, 0x55e49748c6a0Hint:          'Processes run system calls'.
+) = 45
+open(".hello_there", 0, 00)                      = -1
+__fprintf_chk(0x7b97751614e0, 1, 0x55e49748806e, 0x55e49748800c[31mFAIL[0m
+) = 14
+fwrite("\nNext challenge locked. Complete"..., 1, 50, 0x7b97751614e0
+Next challenge locked. Complete more challenges.
+) = 50
+exit(1 <no return ...>
++++ exited (status 1) +++
