@@ -1,0 +1,36 @@
+rt_sigaction(SIGURG, {sa_handler=0x55cebd0ab3d0, sa_mask=[URG], sa_flags=SA_RESTORER|SA_RESTART, sa_restorer=0x778aa47c61d0}, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+write(2, "\nChallenge   0: 'Hello there'\n", 30
+Challenge   0: 'Hello there'
+) = 30
+openat(AT_FDCWD, "/proc/self/loginuid", O_RDONLY) = 3
+read(3, "1000", 12)                     = 4
+close(3)                                = 0
+getrandom("\x74\x2f\xb0\x7b\xab\x07\x21\x1b", 8, GRND_NONBLOCK) = 8
+brk(NULL)                               = 0x55cec377f000
+brk(0x55cec37a0000)                     = 0x55cec37a0000
+newfstatat(AT_FDCWD, "/etc/nsswitch.conf", {st_mode=S_IFREG|0644, st_size=359, ...}, 0) = 0
+newfstatat(AT_FDCWD, "/", {st_mode=S_IFDIR|0755, st_size=142, ...}, 0) = 0
+openat(AT_FDCWD, "/etc/nsswitch.conf", O_RDONLY|O_CLOEXEC) = 3
+fstat(3, {st_mode=S_IFREG|0644, st_size=359, ...}) = 0
+read(3, "# Name Service Switch configurat"..., 4096) = 359
+read(3, "", 4096)                       = 0
+fstat(3, {st_mode=S_IFREG|0644, st_size=359, ...}) = 0
+close(3)                                = 0
+openat(AT_FDCWD, "/etc/passwd", O_RDONLY|O_CLOEXEC) = 3
+fstat(3, {st_mode=S_IFREG|0644, st_size=1991, ...}) = 0
+lseek(3, 0, SEEK_SET)                   = 0
+read(3, "root:x:0:0::/root:/usr/bin/bash\n"..., 4096) = 1991
+close(3)                                = 0
+openat(AT_FDCWD, "riddle.savegame", O_RDWR|O_CREAT, 0600) = 3
+ftruncate(3, 779)                       = 0
+mmap(NULL, 779, PROT_READ|PROT_WRITE, MAP_SHARED, 3, 0) = 0x778aa49b7000
+write(2, "Hint:          'Processes run sy"..., 45Hint:          'Processes run system calls'.
+) = 45
+openat(AT_FDCWD, ".hello_there", O_RDONLY) = -1 ENOENT (No such file or directory)
+write(2, "\33[31mFAIL\33[0m\n", 14FAIL
+)     = 14
+write(2, "\nNext challenge locked. Complete"..., 50
+Next challenge locked. Complete more challenges.
+) = 50
+exit_group(1)                           = ?
++++ exited with 1 +++
