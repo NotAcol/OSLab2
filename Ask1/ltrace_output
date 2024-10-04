@@ -1,42 +1,69 @@
-time(0)                                          = 1728030661
-srand(0x66ffa7c5, 0x7ffef3ed4358, 0x781100d72080, 0x781100d2a680) = 1
-signal(SIGURG, 0x611c8a9553d0)                   = 0
-__fprintf_chk(0x781100d2b4e0, 1, 0x611c8a956011, 0
+time(0)                                          = 1728047675
+srand(0x66ffea3b, 0x7ffd664c5a88, 0x7aeb83791080, 0x7aeb83749680) = 1
+signal(SIGURG, 0x57ed2d86b3d0)                   = 0
+__fprintf_chk(0x7aeb8374a4e0, 1, 0x57ed2d86c011, 0
 Challenge   0: 'Hello there'
 ) = 30
-getlogin_r(0x611c8a95a640, 64, 0, 0)             = 0
+getlogin_r(0x57ed2d870640, 64, 0, 0)             = 0
 open("riddle.savegame", 66, 0600)                = 3
 ftruncate(3, 779)                                = 0
-mmap(0, 779, 3, 1)                               = 0x781100d71000
-fwrite("\033[36mWelcome back challenger. Yo"..., 1, 48, 0x781100d2b4e0[36mWelcome back challenger. You may pass.[0m
+mmap(0, 779, 3, 1)                               = 0x7aeb83790000
+fwrite("\033[36mWelcome back challenger. Yo"..., 1, 48, 0x7aeb8374a4e0[36mWelcome back challenger. You may pass.[0m
 ) = 48
-__fprintf_chk(0x781100d2b4e0, 1, 0x611c8a956011, 1
+__fprintf_chk(0x7aeb8374a4e0, 1, 0x57ed2d86c011, 1
 Challenge   1: 'Gatekeeper'
 ) = 29
-fwrite("\033[36mWelcome back challenger. Yo"..., 1, 48, 0x781100d2b4e0[36mWelcome back challenger. You may pass.[0m
+fwrite("\033[36mWelcome back challenger. Yo"..., 1, 48, 0x7aeb8374a4e0[36mWelcome back challenger. You may pass.[0m
 ) = 48
-__fprintf_chk(0x781100d2b4e0, 1, 0x611c8a956011, 2
+__fprintf_chk(0x7aeb8374a4e0, 1, 0x57ed2d86c011, 2
 Challenge   2: 'A time to kill'
 ) = 33
-__fprintf_chk(0x781100d2b4e0, 1, 0x611c8a95604b, 0x611c8a95a6a0Hint:          'Stuck in the dark, help me move on'.
-) = 53
-signal(SIGALRM, 0x611c8a954350)                  = 0
-signal(SIGCONT, 0x611c8a954350)                  = 0
-alarm(10)                                        = 0
-pause(10, 0x7ffef3ed3f30, 0, 0x781100c25beb <no return ...>
---- SIGALRM (Alarm clock) ---
-<... pause resumed> )                            = 0xffffffff
-__fprintf_chk(0x781100d2b4e0, 1, 0x611c8a95606e, 0x611c8a95a6a0[31mYou were eaten by a grue. FAIL[0m
-) = 40
-__fprintf_chk(0x781100d2b4e0, 1, 0x611c8a956011, 3
+fwrite("\033[36mWelcome back challenger. Yo"..., 1, 48, 0x7aeb8374a4e0[36mWelcome back challenger. You may pass.[0m
+) = 48
+__fprintf_chk(0x7aeb8374a4e0, 1, 0x57ed2d86c011, 3
 Challenge   3: 'what is the answer to life the universe and everything?'
 ) = 74
-__fprintf_chk(0x781100d2b4e0, 1, 0x611c8a95604b, 0x611c8a95a6a0Hint:          'ltrace'.
-) = 25
-getenv("ANSWER")                                 = nil
-__fprintf_chk(0x781100d2b4e0, 1, 0x611c8a95606e, 0x611c8a95600c[31mFAIL[0m
+fwrite("\033[36mWelcome back challenger. Yo"..., 1, 48, 0x7aeb8374a4e0[36mWelcome back challenger. You may pass.[0m
+) = 48
+__fprintf_chk(0x7aeb8374a4e0, 1, 0x57ed2d86c011, 4
+Challenge   4: 'First-in, First-out'
+) = 38
+fwrite("\033[36mWelcome back challenger. Yo"..., 1, 48, 0x7aeb8374a4e0[36mWelcome back challenger. You may pass.[0m
+) = 48
+__fprintf_chk(0x7aeb8374a4e0, 1, 0x57ed2d86c011, 5
+Challenge   5: 'my favourite fd is 99'
+) = 40
+fwrite("\033[36mWelcome back challenger. Yo"..., 1, 48, 0x7aeb8374a4e0[36mWelcome back challenger. You may pass.[0m
+) = 48
+__fprintf_chk(0x7aeb8374a4e0, 1, 0x57ed2d86c011, 6
+Challenge   6: 'ping pong'
+) = 28
+getenv("I_HATE_GAME_HINTS")                      = nil
+__fprintf_chk(0x7aeb8374a4e0, 1, 0x57ed2d86c04b, 0x57ed2d8706a0Hint:          'help us play!'.
+) = 32
+getenv("I_NEED_TECH_HINTS")                      = nil
+fork()                                           = 382387
+fork()                                           = 382388
+wait(0x7ffd664c58e4[382387] PING!
+ <no return ...>
+--- SIGCHLD (Child exited) ---
+--- SIGCHLD (Child exited) ---
+<... wait resumed> )                             = 382387
+wait(0x7ffd664c58e4)                             = 382388
+__fprintf_chk(0x7aeb8374a4e0, 1, 0x57ed2d86c06e, 0x57ed2d86c00c[31mFAIL[0m
 ) = 14
-fwrite("\nNext challenge locked. Complete"..., 1, 50, 0x781100d2b4e0
+__fprintf_chk(0x7aeb8374a4e0, 1, 0x57ed2d86c011, 7
+Challenge   7: 'What's in a name?'
+) = 36
+getenv("I_HATE_GAME_HINTS")                      = nil
+__fprintf_chk(0x7aeb8374a4e0, 1, 0x57ed2d86c04b, 0x57ed2d8706a0Hint:          'A rose, by any other name...'.
+) = 47
+getenv("I_NEED_TECH_HINTS")                      = nil
+__lxstat(1, ".hello_there", 0x7ffd664c57d0)      = 0
+__lxstat(1, ".hey_there", 0x7ffd664c5860)        = -1
+__fprintf_chk(0x7aeb8374a4e0, 1, 0x57ed2d86c06e, 0x57ed2d86c00c[31mFAIL[0m
+) = 14
+fwrite("\nNext challenge locked. Complete"..., 1, 50, 0x7aeb8374a4e0
 Next challenge locked. Complete more challenges.
 ) = 50
 exit(1 <no return ...>
