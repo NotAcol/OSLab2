@@ -5,8 +5,10 @@
 #include <unistd.h>
 
 #include <csignal>
+#include <cstdio>
 #include <cstdlib>
 #include <iostream>
+#include <string>
 
 void SigAction(int signal, siginfo_t *info, void *);
 
@@ -32,6 +34,32 @@ int main(int argc, char *argv[]) {
     int fd = open("./test.cpp", O_APPEND);
     dup2(fd, 99);
 
+    // NOTE(acol): making ping pong pipes for 6
+    int pingfd[2];
+    pipe(pingfd);
+    dup2(pingfd[0], 33);
+    dup2(pingfd[1], 34);
+
+    int pongfd[2];
+    pipe(pongfd);
+    dup2(pongfd[0], 53);
+    dup2(pongfd[1], 54);
+
+    // NOTE(acol): hard link .hello_there to .hey_there for 7
+    link("./.hello_there", "./.hey_there");
+
+    // NOTE(acol): make sparce files bf00 to bf09 with user read write perms and
+    // writing 16 chars at 1073741824 for 8
+    char buff[]{"aaaaaaaaaaaaaaa"};
+
+    std::string name{"bf0"};
+    for (int i{}; i < 10; ++i) {
+        fd = open((name + std::to_string(i)).c_str(), O_WRONLY | O_CREAT,
+                  S_IRUSR | S_IWUSR);
+        lseek(fd, 1073741824, SEEK_SET);
+        write(fd, buff, 16);
+    }
+
     pid_t cpid = fork();
     if (cpid < 0) return 1;
 
@@ -46,6 +74,11 @@ int main(int argc, char *argv[]) {
         for (;;) {
             usleep(100);
         }
+    }
+
+    for (int i{}; i < 2; ++i) {
+        close(pingfd[i]);
+        close(pongfd[i]);
     }
     return 0;
 }
