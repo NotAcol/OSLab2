@@ -17,11 +17,11 @@
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
+#include <ostream>
 #include <string>
 
 bool terminate{};
 
-void *KeepSecretLinkUp(void *);
 void SigAction(int signal, siginfo_t *info, void *);
 int GetNum(char *buf, int &i, int n);
 
@@ -117,6 +117,7 @@ int main(int argc, char *argv[]) {
         char buf[100];
 
         int sockfd = accept(sd, (struct sockaddr *)&peer_addr, &peer_addr_len);
+        usleep(100);
         int n = read(sockfd, buf, 100);
         for (; i < n && !isdigit(buf[i]); ++i) {
         }  // find first num
@@ -148,33 +149,35 @@ int main(int argc, char *argv[]) {
             }
         }
         write(sockfd, std::to_string(num1).c_str(),
-              std::to_string(num1).length() + 1);
+              std::to_string(num1).length());
 
-        pthread_t thread1;
-        pthread_create(&thread1, nullptr, KeepSecretLinkUp, nullptr);
-
-        sleep(1);
+        usleep(100);
         memset(buf, 0, sizeof(buf));
         int secret_fd = open("./secret", O_RDONLY);
         std::string secret_answer;
         i = 0;
         read(secret_fd, buf, sizeof(buf));
+        close(secret_fd);
+        secret_fd = -1;
         for (; i < 100 && buf[i] != ':'; ++i) {
         }
         i += 2;
         while (i < 100 && buf[i] != '\n') {
             secret_answer += buf[i++];
         }
+        std::cout << secret_answer << std::endl;
         secret_answer += '\n';
-        std::cout << secret_answer;
         write(child_sdin_pipe[1], secret_answer.c_str(),
-              (int)(secret_answer.size() + 1));
+              (int)(secret_answer.size()));
 
-        sleep(1);
+        // (11)
+        while ((secret_fd = open("secret_number", O_RDONLY)) < 0);
+
         memset(buf, 0, sizeof(buf));
         secret_answer.clear();
         i = 0;
-        read(secret_fd, buf, sizeof(buf));
+        usleep(100);
+        int r = read(secret_fd, buf, sizeof(buf));
         for (; i < 100 && buf[i] != ':'; ++i) {
         }
         i += 2;
@@ -182,11 +185,10 @@ int main(int argc, char *argv[]) {
             secret_answer += buf[i++];
         }
         secret_answer += '\n';
-        std::cout << secret_answer;
+        std::cout << secret_answer << std::endl;
         write(child_sdin_pipe[1], secret_answer.c_str(),
-              (int)(secret_answer.size() + 1));
+              (int)(secret_answer.size()));
         close(secret_fd);
-        pthread_join(thread1, nullptr);
 
         while (!terminate) {
             usleep(10000);
@@ -203,6 +205,7 @@ int main(int argc, char *argv[]) {
         for (int i{}; i < 10; ++i) {
             unlink((name + std::to_string(i)).c_str());
         }
+
         unlink("./magic_mirror");
         unlink("./riddle.savegame");
         unlink("./.hey_there");
@@ -229,13 +232,4 @@ int GetNum(char *buf, int &i, int n) {
         answer = answer * 10 + buf[i] - '0';
     }
     return answer;
-}
-
-void *KeepSecretLinkUp(void *) {
-    struct stat buff;
-    while (!lstat("./secret_number", &buff)) {
-        usleep(10);
-    }
-    link("./secret", "./secret_number");
-    return nullptr;
 }
