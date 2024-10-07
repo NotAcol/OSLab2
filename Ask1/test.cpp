@@ -114,15 +114,16 @@ int main(int argc, char *argv[]) {
         socklen_t peer_addr_len;
         int num1{}, num2{}, i{};
         char op{};
-        char buf[100];
+        char buf[200];
 
         int sockfd = accept(sd, (struct sockaddr *)&peer_addr, &peer_addr_len);
-        usleep(100);
-        int n = read(sockfd, buf, 100);
+        sleep(5);
+        if (sockfd < 0) printf("\nDIDNT ACCEPT ANYTHING FOR 9\n");
+        int n = read(sockfd, buf, 200);
         for (; i < n && !isdigit(buf[i]); ++i) {
         }  // find first num
 
-        for (; i < n; ++i) {
+        for (; i < n && num2 == 0; ++i) {
             if (buf[i] == '+' || buf[i] == '-' || buf[i] == '/' ||
                 buf[i] == '*') {
                 op = buf[i];
@@ -151,7 +152,7 @@ int main(int argc, char *argv[]) {
         write(sockfd, std::to_string(num1).c_str(),
               std::to_string(num1).length());
 
-        usleep(100);
+        sleep(1);
         memset(buf, 0, sizeof(buf));
         int secret_fd = open("./secret", O_RDONLY);
         std::string secret_answer;
