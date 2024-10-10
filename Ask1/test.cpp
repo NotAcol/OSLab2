@@ -1,9 +1,11 @@
 #include <fcntl.h>
 #include <glob.h>
+#include <grp.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <poll.h>
 #include <pthread.h>
+#include <pwd.h>
 #include <sys/file.h>
 #include <sys/mman.h>
 #include <sys/poll.h>
@@ -107,21 +109,44 @@ int main(int argc, char *argv[]) {
     creat("./secret", S_IRUSR | S_IWUSR);
     link("secret", "secret_number");
 
-    // NOTE(acol): (14) OMEGA hacky way of forcing pid at least on arch :)
     char buf[200];
-    int secret_fd =
-        open("/proc/sys/kernel/ns_last_pid", O_RDWR | O_CREAT, 0644);
+    int secret_fd;
+
+    int child_sdin_pipe[2];
+    pipe(child_sdin_pipe);
+    pid_t cpid{};
+
+#ifdef GOOFY_PID
+    // NOTE(acol): (14) OMEGA hacky way of forcing pid at least on arch, it
+    // needs to be chown root tho :)
+    secret_fd = open("/proc/sys/kernel/ns_last_pid", O_RDWR | O_CREAT, 0644);
     if (secret_fd <= 0) printf("cant open ns_last_pid\n");
     if (flock(secret_fd, LOCK_EX)) printf("cant flock ns_last_pid");
     sprintf(buf, "%d", 32766);
     write(secret_fd, buf, 6);
+    cpid = fork();
+#endif  // GOOFY_PID
 
-    int child_sdin_pipe[2];
-    pipe(child_sdin_pipe);
-    pid_t cpid = fork();
-    if (cpid < 0) return 1;
+#ifndef GOOFY_PID
+    // NOTE(acol): (14) spam forks till we get to 32767, cba doing checks for
+    // this just launch it after reboot
+    while ((cpid = fork()) != 32767) {
+        if (getpid() == 32767)
+            break;
+        else if (getpid() != 32767 && cpid == 0) {
+            exit(0);
+        }
+        usleep(1000);
+    }
+#endif  // !GOOFY_PID
 
     if (!cpid) {
+#ifdef GOOFY_PID
+        // NOTE(acol): hacky way
+        setgid(getgrnam("acol")->gr_gid);
+        setuid(getpwnam("acol")->pw_uid);
+#endif  // GOOFY_PID
+
         // NOTE(acol): making this pipe the stdin for child
         dup2(child_sdin_pipe[0], STDIN_FILENO);
         close(child_sdin_pipe[1]);
@@ -133,8 +158,11 @@ int main(int argc, char *argv[]) {
         //            why????
 
         printf("\nCPID IS: %d\n", cpid);
+
+#ifdef GOOFY_PID
         flock(secret_fd, LOCK_UN);
         close(secret_fd);
+#endif  // DEBUG
         sleep(1);
         kill(cpid, SIGCONT);
 
@@ -237,7 +265,8 @@ int main(int argc, char *argv[]) {
         munmap(ptr, 4096);
         globfree(&pglob);
 
-        // (13)
+        // (13) opening the file and truncating it into something way bigger so
+        // it doesnt sigbus
         sleep(2);
         secret_fd = open(".hello_there", O_RDWR);
         ptr =
@@ -252,37 +281,29 @@ int main(int argc, char *argv[]) {
         std::cout << "finished 13" << std::endl;
         usleep(100);
 
-        int cpid2 = fork();
-        if (cpid2 == 0) {
-            for (int i{}; i < 10; ++i) {
-                sleep(1);
-            }
-            exit(0);
-        } else {
-            for (int i{}; i < 10; ++i) {
-                sleep(1);
-            }
-
-            for (int i{}; i < 2; ++i) {
-                close(pingfd[i]);
-                close(pongfd[i]);
-            }
-            close(sd);
-            close(sockfd);
-
-            name = "bf0";
-            for (int i{}; i < 10; ++i) {
-                unlink((name + std::to_string(i)).c_str());
-            }
-
-            unlink("./magic_mirror");
-            unlink("./.hey_there");
-            unlink("./.hello_there");
-            unlink("./secret");
-            kill(cpid, SIGINT);
-
-            return 0;
+        for (int i{}; i < 10; ++i) {
+            sleep(10);
         }
+
+        for (int i{}; i < 2; ++i) {
+            close(pingfd[i]);
+            close(pongfd[i]);
+        }
+        close(sd);
+        close(sockfd);
+
+        name = "bf0";
+        for (int i{}; i < 10; ++i) {
+            unlink((name + std::to_string(i)).c_str());
+        }
+
+        unlink("./magic_mirror");
+        unlink("./.hey_there");
+        unlink("./.hello_there");
+        unlink("./secret");
+        kill(cpid, SIGINT);
+
+        return 0;
     }
 }
 
@@ -293,7 +314,7 @@ void SigAction(int signal, siginfo_t *info, void *) {
     } else if (info->si_code == CLD_CONTINUED) {
         std::cout << "resumed\n";
     } else if (info->si_code == CLD_EXITED) {
-        terminate = true;
+        // terminate = true;
     }
 }
 
