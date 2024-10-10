@@ -1,8 +1,11 @@
 #include <fcntl.h>
+#include <glob.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <poll.h>
 #include <pthread.h>
+#include <sys/file.h>
+#include <sys/mman.h>
 #include <sys/poll.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -26,6 +29,16 @@ void SigAction(int signal, siginfo_t *info, void *);
 int GetNum(char *buf, int &i, int n);
 
 int main(int argc, char *argv[]) {
+    //-----------------------some cleanup-------------------------------------
+    glob_t pglob{};
+    glob("/tmp/riddle-*", GLOB_NOESCAPE, NULL, &pglob);
+    for (int i{}; i < pglob.gl_pathc; ++i) {
+        unlink(pglob.gl_pathv[i]);
+    }
+    globfree(&pglob);
+    unlink("./riddle.savegame");
+    //----------------------------------------------
+
     // NOTE(acol): making read only file (0) (1)
     creat("./.hello_there", S_IRUSR);
 
@@ -83,13 +96,25 @@ int main(int argc, char *argv[]) {
     //              internet ??
     sin.sin_port = htons(49842);
     sin.sin_addr.s_addr = htonl(INADDR_ANY);
-    if (bind(sd, (struct sockaddr *)&sin, sizeof(sin)) < 0) return 1;
+    if (bind(sd, (struct sockaddr *)&sin, sizeof(sin)) < 0) {
+        std::cout << "failed to bind" << std::endl;
+        return 1;
+    }
 
     listen(sd, 1);
 
     // NOTE(acol): (10) and (11)
     creat("./secret", S_IRUSR | S_IWUSR);
     link("secret", "secret_number");
+
+    // NOTE(acol): (14) OMEGA hacky way of forcing pid at least on arch :)
+    char buf[200];
+    int secret_fd =
+        open("/proc/sys/kernel/ns_last_pid", O_RDWR | O_CREAT, 0644);
+    if (secret_fd <= 0) printf("cant open ns_last_pid\n");
+    if (flock(secret_fd, LOCK_EX)) printf("cant flock ns_last_pid");
+    sprintf(buf, "%d", 32766);
+    write(secret_fd, buf, 6);
 
     int child_sdin_pipe[2];
     pipe(child_sdin_pipe);
@@ -106,6 +131,10 @@ int main(int argc, char *argv[]) {
         // FIX(acol): CHILD PROROCESS DOESNT RAISE SIGCHLD WHEN IT PAUSES
         //            so I had to do this scuffed shit for (2)
         //            why????
+
+        printf("\nCPID IS: %d\n", cpid);
+        flock(secret_fd, LOCK_UN);
+        close(secret_fd);
         sleep(1);
         kill(cpid, SIGCONT);
 
@@ -114,10 +143,8 @@ int main(int argc, char *argv[]) {
         socklen_t peer_addr_len;
         int num1{}, num2{}, i{};
         char op{};
-        char buf[200];
 
         int sockfd = accept(sd, (struct sockaddr *)&peer_addr, &peer_addr_len);
-        sleep(5);
         if (sockfd < 0) printf("\nDIDNT ACCEPT ANYTHING FOR 9\n");
         int n = read(sockfd, buf, 200);
         for (; i < n && !isdigit(buf[i]); ++i) {
@@ -154,7 +181,7 @@ int main(int argc, char *argv[]) {
 
         sleep(1);
         memset(buf, 0, sizeof(buf));
-        int secret_fd = open("./secret", O_RDONLY);
+        secret_fd = open("./secret", O_RDONLY);
         std::string secret_answer;
         i = 0;
         read(secret_fd, buf, sizeof(buf));
@@ -186,34 +213,77 @@ int main(int argc, char *argv[]) {
             secret_answer += buf[i++];
         }
         secret_answer += '\n';
-        std::cout << secret_answer << std::endl;
+        std::cout << secret_answer;
         write(child_sdin_pipe[1], secret_answer.c_str(),
               (int)(secret_answer.size()));
         close(secret_fd);
 
-        while (!terminate) {
-            usleep(10000);
-        }
+        memset(buf, 0, sizeof(buf));
+        chmod(".hello_there", 0644);
+        usleep(10);
+        //  NOTE(acol): (12) finding and mapping the tmp file with glob, the
+        //  offset is the last 3 digits of the hex address
+        printf("Give char: ");
+        char symbol{};
+        scanf("%c", &symbol);
 
-        for (int i{}; i < 2; ++i) {
-            close(pingfd[i]);
-            close(pongfd[i]);
-        }
-        close(sd);
-        close(sockfd);
+        glob("/tmp/riddle-*", GLOB_NOESCAPE, NULL, &pglob);
+        secret_fd = open(pglob.gl_pathv[0], O_RDWR);
+        void *ptr =
+            mmap(NULL, 4096, PROT_READ | PROT_WRITE, MAP_SHARED, secret_fd, 0);
+        *((char *)(ptr) + 111) = symbol;
 
-        name = "bf0";
-        for (int i{}; i < 10; ++i) {
-            unlink((name + std::to_string(i)).c_str());
-        }
+        close(secret_fd);
+        munmap(ptr, 4096);
+        globfree(&pglob);
 
-        unlink("./magic_mirror");
-        unlink("./riddle.savegame");
-        unlink("./.hey_there");
-        unlink("./.hello_there");
-        unlink("./secret");
+        // (13)
+        sleep(2);
+        secret_fd = open(".hello_there", O_RDWR);
+        ptr =
+            mmap(NULL, 20480, PROT_READ | PROT_WRITE, MAP_SHARED, secret_fd, 0);
+
+        sleep(1);
+        ftruncate(secret_fd, 20480);
+
+        write(child_sdin_pipe[1], "\n", 1);
+        close(secret_fd);
+        munmap(ptr, 20480);
+        std::cout << "finished 13" << std::endl;
+        usleep(100);
+
+        int cpid2 = fork();
+        if (cpid2 == 0) {
+            for (int i{}; i < 10; ++i) {
+                sleep(1);
+            }
+            exit(0);
+        } else {
+            for (int i{}; i < 10; ++i) {
+                sleep(1);
+            }
+
+            for (int i{}; i < 2; ++i) {
+                close(pingfd[i]);
+                close(pongfd[i]);
+            }
+            close(sd);
+            close(sockfd);
+
+            name = "bf0";
+            for (int i{}; i < 10; ++i) {
+                unlink((name + std::to_string(i)).c_str());
+            }
+
+            unlink("./magic_mirror");
+            unlink("./.hey_there");
+            unlink("./.hello_there");
+            unlink("./secret");
+            kill(cpid, SIGINT);
+
+            return 0;
+        }
     }
-    return 0;
 }
 
 void SigAction(int signal, siginfo_t *info, void *) {
