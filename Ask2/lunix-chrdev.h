@@ -44,7 +44,8 @@ struct lunix_chrdev_state_struct {
     //  }
 
     /* A buffer used to hold cached textual info */
-    int buf_lim;
+    int buf_lim;  // just using this as a counter of how many bytes were written
+                  // during an update
     unsigned char buf_data[LUNIX_CHRDEV_BUFSZ];
     uint32_t buf_timestamp;
 

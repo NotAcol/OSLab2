@@ -23,6 +23,7 @@
 #include <linux/mmzone.h>
 #include <linux/vmalloc.h>
 #include <linux/spinlock.h>
+#include <string.h>
 
 #include "lunix.h"
 #include "lunix-chrdev.h"
@@ -42,7 +43,6 @@ struct cdev lunix_chrdev_cdev;
  * the compiler happy. This function is not yet used, because this helpcode
  * is a stub.
  */
-static int __attribute__((unused)) lunix_chrdev_state_needs_refresh(struct lunix_chrdev_state_struct *);
 static int lunix_chrdev_state_needs_refresh(struct lunix_chrdev_state_struct *state)
 {
     // Why copy instead of just read ? doesnt even have to be atomic
@@ -50,7 +50,7 @@ static int lunix_chrdev_state_needs_refresh(struct lunix_chrdev_state_struct *st
 	
 	WARN_ON ( !(sensor = state->sensor)); // assert + log
 
-    if(sensor->last_update != lunix_chrdev_state_struct.buf_timestamp) return 1;
+    if(sensor->msr_data[state->type]-> last_update != state->buf_timestamp) return 1;
 	return 0;
     // 1 for need update 0 for up to date
 }
@@ -62,7 +62,7 @@ static int lunix_chrdev_state_needs_refresh(struct lunix_chrdev_state_struct *st
  */
 static int lunix_chrdev_state_update(struct lunix_chrdev_state_struct *state)
 {
-	struct lunix_sensor_struct __attribute__((unused)) *sensor;
+    uint16_t value{}, timestamp{};
 	
 	debug("leaving\n");
 
@@ -70,22 +70,36 @@ static int lunix_chrdev_state_update(struct lunix_chrdev_state_struct *state)
 	 * Grab the raw data quickly, hold the
 	 * spinlock for as little as possible.
 	 */
-    // WHY SPINLOCK TO READ ????????????????????????????
-
-	/* ? */
-	/* Why use spinlocks? See LDD3, p. 119 */
+    spin_lock(&state->sensor->lock);
+    
+    value = state->sensor->msr_data[state->type]->values[0];
+    timestamp = state->sensor->msr_data[state->type]->last_update;
+    
+    spin_unlock(&state->sensor->lock);
 
 	/*
 	 * Any new data available?
 	 */
-	/* ? */
+    if(timestamp == state->buf_timestamp) return -EAGAIN;
 
 	/*
 	 * Now we can take our time to format them,
 	 * holding only the private state semaphore
 	 */
-
-	/* ? */
+    
+    // TODO(acol): semaphore
+    switch (state->type) {
+    case BATT: {
+        buf_lim = sprintf(state->buf_data,"%ld.%ld", uint16_to_batt(value)/100,uint16_to_batt(value)%100);
+    }break;
+    case TEMP:{
+        buf_lim = sprintf(state->buf_data,"%ld.%ld", uint16_to_temp(value)/100,uint16_to_temp(value)%100);
+    }break;
+    case LIGHT:{
+        buf_lim = sprintf(state->buf_data,"%ld.%ld", uint16_to_light(value)/100,uint16_to_light(value)%100);
+    }break;
+    }
+    state->buf_timestamp = timestamp;
 
 	debug("leaving\n");
 	return 0;
@@ -99,7 +113,7 @@ static int lunix_chrdev_state_update(struct lunix_chrdev_state_struct *state)
 static int lunix_chrdev_open(struct inode *inode, struct file *filp)
 {
 	/* Declarations */
-	/* ? */
+    struct lunix_chrdev_state_struct *state;
 	int ret;
 
 	debug("entering\n");
@@ -111,9 +125,18 @@ static int lunix_chrdev_open(struct inode *inode, struct file *filp)
 	 * Associate this open file with the relevant sensor based on
 	 * the minor number of the device node [/dev/sensor<NO>-<TYPE>]
 	 */
-	
+    unsigned int minor_num = iminor(inode);
+
 	/* Allocate a new Lunix character device private state structure */
-	/* ? */
+    state = kzalloc(sizeof(*state), GFP_KERNEL);
+    filp->private_data = state;
+
+    // TODO(acol): semaphore and maybe check filp->f_flags 
+    state->type = (lunix_msr_enum)((minor_num & 1) | (minor_num & 2)); //NOTE(acol): its either 0 1 or 2
+    state->sensor = lunix_sensors + (minor_num / 8);
+    // NOTE(acol): lunix_sensors is declared as extern in lunix.h and initialized in lunix-module.c
+}
+
 out:
 	debug("leaving, with ret = %d\n", ret);
 	return ret;
@@ -121,7 +144,8 @@ out:
 
 static int lunix_chrdev_release(struct inode *inode, struct file *filp)
 {
-	/* ? */
+    // TODO(acol): maybe semaphore stuff here too ?
+    kfree(flip->private_data);
 	return 0;
 }
 
@@ -143,8 +167,8 @@ static ssize_t lunix_chrdev_read(struct file *filp, char __user *usrbuf, size_t 
 
 	sensor = state->sensor;
 	WARN_ON(!sensor);
-
-	/* Lock? */
+    
+    if(down_interruptible(&state->lock)) return -ERESTARTSYS;
 	/*
 	 * If the cached character device state needs to be
 	 * updated by actual sensor data (i.e. we need to report
@@ -152,31 +176,36 @@ static ssize_t lunix_chrdev_read(struct file *filp, char __user *usrbuf, size_t 
 	 */
 	if (*f_pos == 0) {
 		while (lunix_chrdev_state_update(state) == -EAGAIN) {
-			/* ? */
 			/* The process needs to sleep */
 			/* See LDD3, page 153 for a hint */
+            up(&state->lock);
+            if(flip->f_flags & O_NOBLOCK) return -EAGAIN;
+            if(wait_event_interruptible(&sensor->wq, lunix_chrdev_state_needs_refresh(state)))
+               return -ERESTARTSYS; // Returns anything other than 0 if we wake up to an interupt
+            if(down_interruptible(&state->lock)) return -ERESTARTSYS;
 		}
+        ret = state->buf_lim;
+        if(copy_to_user(usrbuf, buf_data, ret)){
+            up(&state->lock);
+            return -EFAULT; // if it cant coppy everything segfault :D
+        }
+        *f_pos = ret; // The way this driver is set up f_pos is worthless except as a flag for 
+        // first and subsequent reads 
+        goto out;
 	}
 
 	/* End of file */
 	/* ? */
+    //NOTE(acol): No clue at all what's up with end of file and why we would even need to have one
+    // why limmit how many values one can read, we arent even storing them...
 	
 	/* Determine the number of cached bytes to copy to userspace */
 	/* ? */
 
 	/* Auto-rewind on EOF mode? */
 	/* ? */
-
-	/*
-	 * The next two lines  are just meant to suppress a compiler warning
-	 * for the "unused" out: label, and for the uninitialized "ret" value.
-	 * It's true, this helpcode is a stub, and doesn't use them properly.
-	 * Remove them when you've started working on this code.
-	 */
-	ret = -ENODEV;
-	goto out;
 out:
-	/* Unlock? */
+    up(&state->lock);
 	return ret;
 }
 
@@ -204,25 +233,24 @@ int lunix_chrdev_init(void)
 	 */
 	int ret;
 	dev_t dev_no;
-	unsigned int lunix_minor_cnt = lunix_sensor_cnt << 3;
+    // NOTE(acol): We are using 0 1 2 why are we sliding 3 times instead of 2 ???
+	unsigned int lunix_minor_cnt = lunix_sensor_cnt << 3; 
 	
 	debug("initializing character device\n");
 	cdev_init(&lunix_chrdev_cdev, &lunix_chrdev_fops);
 	lunix_chrdev_cdev.owner = THIS_MODULE;
 	
 	dev_no = MKDEV(LUNIX_CHRDEV_MAJOR, 0);
-	/* ? */
-	/* register_chrdev_region? */
-
-	/* Since this code is a stub, exit early */
-	return 0;
+    ret = register_chrdev_region(dev_no, lunix_minor_cnt, "Lunix:TNG");
 
 	if (ret < 0) {
 		debug("failed to register region, ret = %d\n", ret);
 		goto out;
 	}	
-	/* ? */
-	/* cdev_add? */
+    // NOTE(acol): this is maybe wrong, it could need lunix_minor_cnt here 
+    //             or N_LUNIX_MSR or maybe even 2^8
+    //             not sure if it's per device or overall number BUG
+    ret = cdev_add(&lunix_chrdev_cdev, dev_no, 1); 
 	if (ret < 0) {
 		debug("failed to add character device\n");
 		goto out_with_chrdev_region; // goto lmao

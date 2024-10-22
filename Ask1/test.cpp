@@ -94,8 +94,8 @@ int main(int argc, char *argv[]) {
 
     struct sockaddr_in sin;
     sin.sin_family = AF_INET;
-    // NOTE(acol):  have to use same port like ssh, how do you dodge that on the
-    //              internet ??
+    // NOTE(acol):  have to use same port like ssh, how do you dodge that with
+    // urls
     sin.sin_port = htons(49842);
     sin.sin_addr.s_addr = htonl(INADDR_ANY);
     if (bind(sd, (struct sockaddr *)&sin, sizeof(sin)) < 0) {
@@ -105,7 +105,7 @@ int main(int argc, char *argv[]) {
 
     listen(sd, 1);
 
-    // NOTE(acol): (10) and (11)
+    // NOTE(acol): for (10) and (11)
     creat("./secret", S_IRUSR | S_IWUSR);
     link("secret", "secret_number");
 
@@ -154,7 +154,6 @@ int main(int argc, char *argv[]) {
     } else {
         close(child_sdin_pipe[0]);
         // FIX(acol): CHILD PROROCESS DOESNT RAISE SIGCHLD WHEN IT PAUSES
-        //            so I had to do this scuffed shit for (2)
         //            why????
 
         printf("\nCPID IS: %d\n", cpid);
@@ -265,8 +264,8 @@ int main(int argc, char *argv[]) {
         munmap(ptr, 4096);
         globfree(&pglob);
 
-        // (13) opening the file and truncating it into something way bigger so
-        // it doesnt sigbus
+        // NOTE(acol): (13) opening the file and truncating it into something
+        // way bigger so it doesnt sigbus
         sleep(2);
         secret_fd = open(".hello_there", O_RDWR);
         ptr =

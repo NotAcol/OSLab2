@@ -79,7 +79,7 @@ void lunix_sensor_update(struct lunix_sensor_struct *s,
 	/*
 	 * Update the raw values and the relevant timestamps.
 	 */
-	s->msr_data[BATT]->values[0] = batt;
+	s->msr_data[BATT]->values[0] = batt; // storing uint16_t in uint32_t why even
 	s->msr_data[TEMP]->values[0] = temp;
 	s->msr_data[LIGHT]->values[0] = light;
 
