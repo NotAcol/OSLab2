@@ -20,6 +20,7 @@
 
 #ifdef __KERNEL__
 
+#include <asm/semaphore.h>
 #include <linux/fs.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -44,8 +45,8 @@ struct lunix_chrdev_state_struct {
     //  }
 
     /* A buffer used to hold cached textual info */
-    int buf_lim;  // just using this as a counter of how many bytes were written
-                  // during an update
+    int buf_lim;  // just using this as a counter of how many bytes were last
+                  // written to buf_data (mainly for copy_to_user)
     unsigned char buf_data[LUNIX_CHRDEV_BUFSZ];
     uint32_t buf_timestamp;
 

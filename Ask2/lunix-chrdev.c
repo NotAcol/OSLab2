@@ -86,8 +86,7 @@ static int lunix_chrdev_state_update(struct lunix_chrdev_state_struct *state)
 	 * Now we can take our time to format them,
 	 * holding only the private state semaphore
 	 */
-    
-    // TODO(acol): semaphore
+    // NOTE(acol): not holding semaphores here cause this is only called by read when it's already locked
     switch (state->type) {
     case BATT: {
         buf_lim = sprintf(state->buf_data,"%ld.%ld", uint16_to_batt(value)/100,uint16_to_batt(value)%100);
@@ -99,6 +98,7 @@ static int lunix_chrdev_state_update(struct lunix_chrdev_state_struct *state)
         buf_lim = sprintf(state->buf_data,"%ld.%ld", uint16_to_light(value)/100,uint16_to_light(value)%100);
     }break;
     }
+    --buf_lim; // removing trailing '\0'
     state->buf_timestamp = timestamp;
 
 	debug("leaving\n");
@@ -131,7 +131,8 @@ static int lunix_chrdev_open(struct inode *inode, struct file *filp)
     state = kzalloc(sizeof(*state), GFP_KERNEL);
     filp->private_data = state;
 
-    // TODO(acol): semaphore and maybe check filp->f_flags 
+    // TODO(acol): maybe check filp->f_flags 
+    init_MUTEX(state->lock);
     state->type = (lunix_msr_enum)((minor_num & 1) | (minor_num & 2)); //NOTE(acol): its either 0 1 or 2
     state->sensor = lunix_sensors + (minor_num / 8);
     // NOTE(acol): lunix_sensors is declared as extern in lunix.h and initialized in lunix-module.c
@@ -144,7 +145,6 @@ out:
 
 static int lunix_chrdev_release(struct inode *inode, struct file *filp)
 {
-    // TODO(acol): maybe semaphore stuff here too ?
     kfree(flip->private_data);
 	return 0;
 }
@@ -157,7 +157,7 @@ static long lunix_chrdev_ioctl(struct file *filp, unsigned int cmd, unsigned lon
 
 static ssize_t lunix_chrdev_read(struct file *filp, char __user *usrbuf, size_t cnt, loff_t *f_pos)
 {
-	ssize_t ret;
+	ssize_t ret{},temp{};
 
 	struct lunix_sensor_struct *sensor;
 	struct lunix_chrdev_state_struct *state;
@@ -185,12 +185,12 @@ static ssize_t lunix_chrdev_read(struct file *filp, char __user *usrbuf, size_t 
             if(down_interruptible(&state->lock)) return -ERESTARTSYS;
 		}
         ret = state->buf_lim;
-        if(copy_to_user(usrbuf, buf_data, ret)){
+        if(copy_to_user(usrbuf, state->buf_data, ret)){
             up(&state->lock);
             return -EFAULT; // if it cant coppy everything segfault :D
         }
         *f_pos = ret; // The way this driver is set up f_pos is worthless except as a flag for 
-        // first and subsequent reads 
+        // first and subsequent reads since EOF doesnt even make sense if we arent caching updates
         goto out;
 	}
 
@@ -200,7 +200,29 @@ static ssize_t lunix_chrdev_read(struct file *filp, char __user *usrbuf, size_t 
     // why limmit how many values one can read, we arent even storing them...
 	
 	/* Determine the number of cached bytes to copy to userspace */
-	/* ? */
+    if(cnt < 6) {
+        up(&state->lock);
+        return -EFAULT;
+    }
+    while (cnt>=6) {
+		while (lunix_chrdev_state_update(state) == -EAGAIN) {
+            up(&state->lock);
+            if(flip->f_flags & O_NOBLOCK) return -EAGAIN;
+            if(wait_event_interruptible(&sensor->wq, lunix_chrdev_state_needs_refresh(state)))
+               return -ERESTARTSYS; // Returns anything other than 0 if we wake up to an interupt
+            if(down_interruptible(&state->lock)) return -ERESTARTSYS;
+		}
+        if(cnt>6 && temp) state->buf_data[state->buf_lim++] = ' '; // gap if not first number written
+        if(cnt==6 && temp) break; // edge case
+        temp = state->buf_lim;
+        if(copy_to_user(usrbuf, state->buf_data, temp)){
+            up(&state->lock);
+            return -EFAULT;
+        }
+        ret += temp;
+        userbuf += temp;
+        cnt -= temp;
+    }
 
 	/* Auto-rewind on EOF mode? */
 	/* ? */
@@ -216,7 +238,7 @@ static int lunix_chrdev_mmap(struct file *filp, struct vm_area_struct *vma)
 
 static struct file_operations lunix_chrdev_fops = 
 {
-        .owner          = THIS_MODULE,
+    .owner          = THIS_MODULE,
 	.open           = lunix_chrdev_open,
 	.release        = lunix_chrdev_release,
 	.read           = lunix_chrdev_read,
@@ -247,7 +269,7 @@ int lunix_chrdev_init(void)
 		debug("failed to register region, ret = %d\n", ret);
 		goto out;
 	}	
-    // NOTE(acol): this is maybe wrong, it could need lunix_minor_cnt here 
+    // FIX(acol): this is maybe wrong, it could need lunix_minor_cnt here 
     //             or N_LUNIX_MSR or maybe even 2^8
     //             not sure if it's per device or overall number BUG
     ret = cdev_add(&lunix_chrdev_cdev, dev_no, 1); 
